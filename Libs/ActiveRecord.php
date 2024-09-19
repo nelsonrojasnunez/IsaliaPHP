@@ -53,6 +53,7 @@ class ActiveRecord
     public function __construct()
     {
         $this->connect();
+        $this->initialize();
     }
 
     /**
@@ -228,6 +229,110 @@ class ActiveRecord
     public function __destruct()
     {
         $this->connection = null;
+    }
+
+    /**
+     * Relaciones entre tablas
+     * @var array
+     */
+    protected $relationships = [];
+
+    /**
+     * Define una relación de uno a muchos
+     * @param string $relatedClass
+     * @param string $foreignKey
+     */
+    public function hasMany($relatedClass, $foreignKey = null)
+    {
+        if (!$foreignKey) {
+            $foreignKey = strtolower(get_class($this)) . '_id';
+        }
+        $this->relationships[strtolower($relatedClass)] = [
+            'type' => 'hasMany',
+            'class' => $relatedClass,
+            'foreignKey' => $foreignKey
+        ];
+    }
+
+    /**
+     * Define una relación de muchos a uno
+     * @param string $relatedClass
+     * @param string $foreignKey
+     */
+    public function belongsTo($relatedClass, $foreignKey = null)
+    {
+        if (!$foreignKey) {
+            $foreignKey = strtolower($relatedClass) . '_id';
+        }
+        $this->relationships[strtolower($relatedClass)] = [
+            'type' => 'belongsTo',
+            'class' => $relatedClass,
+            'foreignKey' => $foreignKey
+        ];
+    }
+
+    /**
+     * Define una relación de uno a uno
+     * @param string $relatedClass
+     * @param string $foreignKey
+     */
+    public function hasOne($relatedClass, $foreignKey = null)
+    {
+        if (!$foreignKey) {
+            $foreignKey = strtolower(get_class($this)) . '_id';
+        }
+        $this->relationships[strtolower($relatedClass)] = [
+            'type' => 'hasOne',
+            'class' => $relatedClass,
+            'foreignKey' => $foreignKey
+        ];
+    }
+
+    /**
+     * Método mágico para manejar las relaciones
+     * @param string $name
+     * @param array $arguments
+     * @return mixed
+     */
+    public function __call($name, $arguments)
+    {
+        if (isset($this->relationships[$name])) {
+            $relationship = $this->relationships[$name];
+            $relatedClass = $relationship['class'];
+            $foreignKey = $relationship['foreignKey'];
+
+            $related = new $relatedClass();
+
+            switch ($relationship['type']) {
+                case 'hasMany':
+                    return $related->findAll("$foreignKey = :id", ['id' => $this->id]);
+                case 'belongsTo':
+                    return $related->find($this->$foreignKey);
+                case 'hasOne':
+                    return $related->findAll("$foreignKey = :id", ['id' => $this->id])[0] ?? null;
+            }
+        }
+
+        throw new Exception("Method $name not found");
+    }
+
+    /**
+     * Método para inicializar el modelo
+     * Este método debe ser sobrescrito en las clases hijas
+     */
+    protected function initialize()
+    {
+        // Este método está vacío en la clase base
+        // Las clases hijas lo sobrescribirán para definir relaciones y otras configuraciones
+    }
+
+    /**
+     * Establece el nombre de la tabla
+     * @param string $tableName
+     */
+    protected function setTable($tableName)
+    {
+        $this->table = $tableName;
     }
 }
 
